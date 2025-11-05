@@ -1,7 +1,7 @@
 import json
 import hashlib
 import yaml
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional, Dict, List
 
 from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
@@ -20,8 +20,8 @@ class HomeAssistantController:
         Args:
             config_path: Path to the JSON configuration file.
         """
-        self.config = self._load_config(config_path)
-        self.client = Client(self.config)
+        self.config: Dict[str, Any] = self._load_config(config_path)
+        self.client: Client = Client(self.config)
         self._context: Optional[List[Dict[str, Any]]] = None
         self._context_hash: Optional[str] = None
 
@@ -42,17 +42,19 @@ class HomeAssistantController:
             if not context_response.content or not isinstance(context_response.content[0], TextContent):
                 raise ToolError("Received an empty or invalid response from GetLiveContext.")
 
-            context_json = json.loads(context_response.content[0].text)
+            # Use type assertion for TextContent
+            text_content: TextContent = context_response.content[0]
+            context_json: Dict[str, Any] = json.loads(text_content.text)
             if not context_json.get("success"):
                 raise ToolError(f"API call to GetLiveContext failed: {context_json.get('result')}")
 
-            result_str = context_json.get("result", "")
+            result_str: str = context_json.get("result", "")
             return result_str.replace(CONTEXT_PREFIX, "").strip()
 
     def _process_context(self, context_list: List[Dict[str, Any]]) -> None:
         """Adds a unique MD5 hash ID to each device in the context list."""
         for item in context_list:
-            names = item.get("names", "")
+            names: str = item.get("names", "")
             item["id"] = hashlib.md5(names.encode("utf-8")).hexdigest()
 
     async def get_processed_context(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
@@ -68,14 +70,14 @@ class HomeAssistantController:
         Returns:
             A list of dictionaries, each representing a device with a unique 'id'.
         """
-        raw_context_str = await self._get_raw_context()
-        new_hash = hashlib.md5(raw_context_str.encode("utf-8")).hexdigest()
+        raw_context_str: str = await self._get_raw_context()
+        new_hash: str = hashlib.md5(raw_context_str.encode("utf-8")).hexdigest()
 
         if force_refresh or self._context is None or self._context_hash != new_hash:
             try:
                 # The context from Home Assistant is still in YAML format, so we use yaml.safe_load here.
                 # If the API also returns JSON, you can change this to json.loads().
-                context_list = yaml.safe_load(raw_context_str)
+                context_list: Any = yaml.safe_load(raw_context_str)
                 if not isinstance(context_list, list):
                      raise ToolError("Parsed context from Home Assistant is not a list.")
                 self._process_context(context_list)
@@ -95,7 +97,10 @@ class HomeAssistantController:
         arguments = {"name": names, "area": areas}
         async with self.client:
             result = await self.client.call_tool(name=tool_name, arguments=arguments)
-            return json.loads(result.content[0].text)
+            if not result.content or not isinstance(result.content[0], TextContent):
+                raise ToolError("Response content is empty or invalid")
+            text_content: TextContent = result.content[0]
+            return json.loads(text_content.text)
 
     async def control_switch(self, device_ids: List[str], on: bool) -> List[Dict[str, Any]]:
         """
@@ -108,8 +113,8 @@ class HomeAssistantController:
         Returns:
             A list of dictionaries, each representing the result of an operation.
         """
-        context = await self.get_processed_context()
-        results = []
+        context: List[Dict[str, Any]] = await self.get_processed_context()
+        results: List[Dict[str, Any]] = []
         
         for device_id in device_ids:
             target_device = next((item for item in context if item.get("id") == device_id), None)
@@ -118,15 +123,15 @@ class HomeAssistantController:
                 results.append({"success": False, "error": f"Device with id '{device_id}' not found."})
                 continue
 
-            names = target_device.get("names")
-            areas = target_device.get("areas")
+            names: Optional[str] = target_device.get("names")
+            areas: Optional[str] = target_device.get("areas")
 
             if names is None or areas is None:
                 results.append({"success": False, "error": f"Device '{device_id}' is missing 'names' or 'areas' information."})
                 continue
 
             try:
-                result = await self._hass_turn(names, areas, on)
+                result: Dict[str, Any] = await self._hass_turn(names, areas, on)
                 results.append({"success": True, "device_id": device_id, "result": result})
             except Exception as e:
                 results.append({"success": False, "device_id": device_id, "error": str(e)})
@@ -135,13 +140,16 @@ class HomeAssistantController:
 
     async def _hass_light_set(self, names: str, area: str, brightness: Optional[int] = None) -> Dict[str, Any]:
         """Helper function to set light brightness via MCP tool call."""
-        arguments = {"name": names, "area": area}
+        arguments: Dict[str, str] = {"name": names, "area": area}
         if brightness is not None:
-            arguments["brightness"] = brightness
+            arguments["brightness"] = str(brightness)
         
         async with self.client:
             result = await self.client.call_tool(name="HassLightSet", arguments=arguments)
-            return json.loads(result.content[0].text)
+            if not result.content or not isinstance(result.content[0], TextContent):
+                raise ToolError("Response content is empty or invalid")
+            text_content: TextContent = result.content[0]
+            return json.loads(text_content.text)
 
     async def control_light_brightness(self, device_ids: List[str], brightness: Optional[int] = None) -> List[Dict[str, Any]]:
         """
@@ -154,8 +162,8 @@ class HomeAssistantController:
         Returns:
             A list of dictionaries, each representing the result of an operation.
         """
-        context = await self.get_processed_context()
-        results = []
+        context: List[Dict[str, Any]] = await self.get_processed_context()
+        results: List[Dict[str, Any]] = []
         
         for device_id in device_ids:
             target_device = next((item for item in context if item.get("id") == device_id), None)
@@ -164,15 +172,15 @@ class HomeAssistantController:
                 results.append({"success": False, "error": f"Device with id '{device_id}' not found."})
                 continue
 
-            names = target_device.get("names")
-            areas = target_device.get("areas")
+            names: Optional[str] = target_device.get("names")
+            areas: Optional[str] = target_device.get("areas")
 
             if names is None or areas is None:
                 results.append({"success": False, "error": f"Device '{device_id}' is missing 'names' or 'areas' information."})
                 continue
 
             try:
-                result = await self._hass_light_set(names, areas, brightness)
+                result: Dict[str, Any] = await self._hass_light_set(names, areas, brightness)
                 results.append({"success": True, "device_id": device_id, "result": result})
             except Exception as e:
                 results.append({"success": False, "device_id": device_id, "error": str(e)})
@@ -187,12 +195,12 @@ mcp_home_assistant = FastMCP(
 )
 
 # Instantiate the controller.
+controller: Optional[HomeAssistantController] = None
 try:
     # The default path is now config.json, so no argument is needed if the file is in the same directory.
     controller = HomeAssistantController()
 except ToolError as e:
     print(f"FATAL: Failed to initialize HomeAssistantController: {e}")
-    controller = None
 
 @mcp_home_assistant.tool
 async def get_device_info() -> List[Dict[str, Any]]:
