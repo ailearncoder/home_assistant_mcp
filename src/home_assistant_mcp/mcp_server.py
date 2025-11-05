@@ -13,25 +13,29 @@ CONTEXT_PREFIX = "Live Context: An overview of the areas and the devices in this
 class HomeAssistantController:
     """A controller to interact with the Home Assistant MCP server."""
 
-    def __init__(self, config_path: str = "config.json"):
+    def __init__(self, config: str | Dict[str, Any] = "config.json"):
         """
         Initializes the controller by loading config and creating a client.
 
         Args:
-            config_path: Path to the JSON configuration file.
+            config: Path to the JSON configuration file or a dictionary configuration object.
         """
-        self.config: Dict[str, Any] = self._load_config(config_path)
+        self.config: Dict[str, Any] = self._load_config(config)
         self.client: Client = Client(self.config)
         self._context: Optional[List[Dict[str, Any]]] = None
         self._context_hash: Optional[str] = None
 
-    def _load_config(self, config_path: str) -> Dict[str, Any]:
-        """Loads configuration from a JSON file."""
+    def _load_config(self, config: str | Dict[str, Any]) -> Dict[str, Any]:
+        """Loads configuration from a JSON file or returns the config dictionary."""
+        if isinstance(config, dict):
+            return config
+        
+        # If it's not a dict, treat it as a file path
         try:
-            with open(config_path, "r") as f:
+            with open(config, "r") as f:
                 return json.load(f)
         except FileNotFoundError:
-            raise ToolError(f"Configuration file not found at: {config_path}")
+            raise ToolError(f"Configuration file not found at: {config}")
         except json.JSONDecodeError as e:
             raise ToolError(f"Error parsing JSON configuration: {e}")
 
