@@ -1,0 +1,19 @@
+[project]
+name = "home-assistant-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "ailearncoder", email = "ailearncoder8@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=2.13.0.2",
+]
+
+[project.scripts]
+home-assistant-mcp = "home_assistant_mcp:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
