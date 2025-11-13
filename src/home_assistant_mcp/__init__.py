@@ -11,8 +11,8 @@ def main() -> None:
     config = {
         "mcpServers": {
             "home_assistant": {
-                "transport": "streamablehttp",
-                "url": f"{home_assistant_url}/api/mcp",
+                "transport": "sse",
+                "url": f"{home_assistant_url}/mcp_server/sse",
                 "headers": {"Authorization": f"Bearer {token}"},
             }
         }
