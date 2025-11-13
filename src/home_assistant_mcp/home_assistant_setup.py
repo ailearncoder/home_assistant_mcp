@@ -203,7 +203,6 @@ def get_or_create_long_token_sync():
     return asyncio.run(get_or_create_long_token())
 
 if __name__ == "__main__":
-    import asyncio
     logging.basicConfig(level=logging.INFO)
     token = get_or_create_long_token_sync()
     logging.info(f"Get or create long-lived token success, token: {token}")
