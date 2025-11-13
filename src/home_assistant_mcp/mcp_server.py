@@ -223,74 +223,72 @@ class HomeAssistantController:
         logger.info(f"Light brightness completed: success={sum(1 for r in results if r.get('success'))}, fail={sum(1 for r in results if not r.get('success'))}")
         return results
 
-# --- FastMCP Tool Definition ---
+class MCPHomeAssistantServer:
+    """封装 FastMCP 与 HomeAssistantController，去除全局 controller。"""
 
-mcp_home_assistant = FastMCP(
-    name="HomeAssistant",
-    instructions="A tool to control devices in a Home Assistant smart home.",
-)
+    def __init__(self, config: str | Dict[str, Any] = "config.json") -> None:
+        logger.info("Initializing MCPHomeAssistantServer")
+        try:
+            self.controller = HomeAssistantController(config)
+        except ToolError:
+            logger.exception("Failed to initialize HomeAssistantController")
+            raise
 
-# Instantiate the controller.
-controller: Optional[HomeAssistantController] = None
-try:
-    # The default path is now config.json, so no argument is needed if the file is in the same directory.
-    controller = HomeAssistantController()
-except ToolError as e:
-    logger.exception("Failed to initialize HomeAssistantController")
+        self.mcp = FastMCP(
+            name="HomeAssistant",
+            instructions="A tool to control devices in a Home Assistant smart home.",
+        )
 
-@mcp_home_assistant.tool
-async def get_device_info() -> List[Dict[str, Any]]:
-    """
-    Get information about all available devices.
-    Before using switch_control, you should call this tool to get the device 'id'.
-    """
-    if not controller:
-        raise ToolError("HomeAssistantController is not initialized.")
-    try:
-        logger.info("get_device_info invoked")
-        return await controller.get_processed_context(force_refresh=True)
-    except Exception as e:
-        logger.exception("Error getting device info")
-        raise ToolError(f"An error occurred while getting device info: {e}")
+        async def get_device_info() -> List[Dict[str, Any]]:
+            try:
+                logger.info("get_device_info invoked")
+                return await self.controller.get_processed_context(force_refresh=True)
+            except Exception as e:
+                logger.exception("Error getting device info")
+                raise ToolError(f"An error occurred while getting device info: {e}")
 
-@mcp_home_assistant.tool
-async def switch_control(id: List[str], on: bool) -> List[Dict[str, Any]]:
-    """
-    Control switch devices.
+        async def switch_control(id: List[str], on: bool) -> List[Dict[str, Any]]:
+            """
+            Control switch devices.
 
-    Args:
-        id: A list of device 'id's, obtained from get_device_info.
-        on: Set to true to turn the devices on, false to turn them off.
-    """
-    if not controller:
-        raise ToolError("HomeAssistantController is not initialized.")
-    try:
-        logger.info("switch_control invoked")
-        return await controller.control_switch(device_ids=id, on=on)
-    except Exception as e:
-        logger.exception("Error during switch control")
-        raise ToolError(f"An error occurred during switch control: {e}")
+            Args:
+                id: Device ids from get_device_info.
+                on: True to turn on, False to turn off.
+            """
+            try:
+                logger.info("switch_control invoked")
+                return await self.controller.control_switch(device_ids=id, on=on)
+            except Exception as e:
+                logger.exception("Error during switch control")
+                raise ToolError(f"An error occurred during switch control: {e}")
 
-@mcp_home_assistant.tool
-async def light_set(id: List[str], brightness: Optional[int] = None) -> List[Dict[str, Any]]:
-    """
-    Set the brightness percentage of light devices.
+        async def light_set(id: List[str], brightness: Optional[int] = None) -> List[Dict[str, Any]]:
+            """
+            Set light brightness percentage.
 
-    Args:
-        id: A list of device 'id's, obtained from get_device_info.
-        brightness: Brightness percentage (0-100), or None to turn off.
-    """
-    if not controller:
-        raise ToolError("HomeAssistantController is not initialized.")
-    try:
-        logger.info("light_set invoked")
-        return await controller.control_light_brightness(device_ids=id, brightness=brightness)
-    except Exception as e:
-        logger.exception("Error during light brightness control")
-        raise ToolError(f"An error occurred during light brightness control: {e}")
+            Args:
+                id: Device ids from get_device_info.
+                brightness: 0-100 or None to turn off.
+            """
+            try:
+                logger.info("light_set invoked")
+                return await self.controller.control_light_brightness(device_ids=id, brightness=brightness)
+            except Exception as e:
+                logger.exception("Error during light brightness control")
+                raise ToolError(f"An error occurred during light brightness control: {e}")
+
+        self.mcp.tool(get_device_info)
+        self.mcp.tool(switch_control)
+        self.mcp.tool(light_set)
+
+        logger.info("MCPHomeAssistantServer initialized and tools registered")
+
+    def run(self) -> None:
+        logger.info("Starting HomeAssistant MCP server")
+        self.mcp.run()
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    if controller:
-        logger.info("Starting HomeAssistant MCP server")
-        mcp_home_assistant.run()
+    server = MCPHomeAssistantServer()
+    server.run()
