@@ -7,7 +7,11 @@ def main() -> None:
     from .home_assistant_setup import home_assistant_url
 
     logging.basicConfig(level=logging.INFO)
-    token = get_or_create_long_token_sync()
+    try:
+        token = get_or_create_long_token_sync()
+    except BaseException as e:
+        logging.error(f"Failed to get or create long token: {e}")
+        return
     config = {
         "mcpServers": {
             "home_assistant": {

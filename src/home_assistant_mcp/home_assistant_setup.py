@@ -1,4 +1,10 @@
-from home_assistant_sdk import (HomeAssistantAuth, HAWebSocketClient, HomeAssistantIntegrationFlow, MCPServerIntegration)
+from home_assistant_sdk import (
+    HomeAssistantAuth,
+    HAWebSocketClient,
+    HomeAssistantIntegrationFlow,
+    MCPServerIntegration,
+    HAAuthError,
+)
 import asyncio
 import logging
 import os
@@ -40,6 +46,25 @@ async def get_or_create_long_token():
     
     # 构建WebSocket URL
     home_assistant_ws = _build_websocket_url(home_assistant_url)
+
+    try:
+        # 通过WebSocket连接处理MCP令牌和集成设置
+        async with HAWebSocketClient(
+            home_assistant_ws,
+            token_info["access_token"],
+            auto_reconnect=False
+        ) as cli:
+            # 获取或创建MCP令牌
+            mcp_token = await _get_or_create_mcp_token(cli, token_file)
+            
+            # 设置MCP集成（如果需要）
+            await _setup_mcp_integration_if_needed(cli, mcp_token)
+            
+    except HAAuthError as e:
+        logging.error(f"Home Assistant authentication error: {e}")
+        if os.path.exists(token_file):
+            os.remove(token_file)
+        raise
     
     # 通过WebSocket连接处理MCP令牌和集成设置
     async with HAWebSocketClient(
