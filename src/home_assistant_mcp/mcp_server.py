@@ -34,7 +34,7 @@ class HomeAssistantController:
         if isinstance(config, dict):
             logger.debug("Using provided dict configuration")
             return config
-        
+
         # If it's not a dict, treat it as a file path
         try:
             with open(config, "r") as f:
@@ -105,7 +105,7 @@ class HomeAssistantController:
             except yaml.YAMLError as e:
                 logger.error(f"Error parsing YAML from context: {e}")
                 raise ToolError(f"Error parsing YAML from context: {e}")
-        
+
         if self._context is None:
             logger.error("Context is None after processing")
             raise ToolError("Failed to load context.")
@@ -140,7 +140,7 @@ class HomeAssistantController:
         logger.info(f"Switch control request: count={len(device_ids)}, on={on}")
         context: List[Dict[str, Any]] = await self.get_processed_context()
         results: List[Dict[str, Any]] = []
-        
+
         for device_id in device_ids:
             target_device = next((item for item in context if item.get("id") == device_id), None)
 
@@ -163,16 +163,15 @@ class HomeAssistantController:
             except Exception as e:
                 logger.exception(f"Error controlling switch for id={device_id}")
                 results.append({"success": False, "device_id": device_id, "error": str(e)})
-        
+
         logger.info(f"Switch control completed: success={sum(1 for r in results if r.get('success'))}, fail={sum(1 for r in results if not r.get('success'))}")
         return results
 
-    async def _hass_light_set(self, names: str, area: str, brightness: Optional[int] = None) -> Dict[str, Any]:
+    async def _hass_light_set(self, names: str, area: str, brightness: Optional[int] = 0) -> Dict[str, Any]:
         """Helper function to set light brightness via MCP tool call."""
-        arguments: Dict[str, str] = {"name": names, "area": area}
-        if brightness is not None:
-            arguments["brightness"] = brightness
-        
+        arguments: Dict[str, Any] = {"name": names, "area": area}
+        arguments["brightness"] = brightness
+
         async with self.client:
             logger.info(f"Calling HassLightSet for name={names}, area={area}, brightness={brightness}")
             result = await self.client.call_tool(name="HassLightSet", arguments=arguments)
@@ -182,13 +181,13 @@ class HomeAssistantController:
             text_content: TextContent = result.content[0]
             return json.loads(text_content.text)
 
-    async def control_light_brightness(self, device_ids: List[str], brightness: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def control_light_brightness(self, device_ids: List[str], brightness: Optional[int] = 0) -> List[Dict[str, Any]]:
         """
         Finds light devices by their IDs and sets their brightness.
 
         Args:
             device_ids: A list of unique IDs of the light devices to control.
-            brightness: Brightness percentage (0-100), or None to turn off.
+            brightness: Brightness percentage (0-100), 0 means off.
 
         Returns:
             A list of dictionaries, each representing the result of an operation.
@@ -196,7 +195,7 @@ class HomeAssistantController:
         logger.info(f"Light brightness request: count={len(device_ids)}, brightness={brightness}")
         context: List[Dict[str, Any]] = await self.get_processed_context()
         results: List[Dict[str, Any]] = []
-        
+
         for device_id in device_ids:
             target_device = next((item for item in context if item.get("id") == device_id), None)
 
@@ -219,7 +218,7 @@ class HomeAssistantController:
             except Exception as e:
                 logger.exception(f"Error setting light brightness for id={device_id}")
                 results.append({"success": False, "device_id": device_id, "error": str(e)})
-        
+
         logger.info(f"Light brightness completed: success={sum(1 for r in results if r.get('success'))}, fail={sum(1 for r in results if not r.get('success'))}")
         return results
 
@@ -268,13 +267,13 @@ class MCPHomeAssistantServer:
                 logger.exception("Error during switch control")
                 raise ToolError(f"An error occurred during switch control: {e}")
 
-        async def light_set(id: List[str], brightness: Optional[int] = None) -> List[Dict[str, Any]]:
+        async def light_set(id: List[str], brightness: Optional[int] = 0) -> List[Dict[str, Any]]:
             """
             Set light brightness percentage.
 
             Args:
                 id: Device ids from get_device_info.
-                brightness: 0-100 or None to turn off.
+                brightness: 0-100, 0 to turn off.
             """
             try:
                 logger.info("light_set invoked")
