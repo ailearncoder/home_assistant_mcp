@@ -171,7 +171,7 @@ class HomeAssistantController:
         """Helper function to set light brightness via MCP tool call."""
         arguments: Dict[str, str] = {"name": names, "area": area}
         if brightness is not None:
-            arguments["brightness"] = str(brightness)
+            arguments["brightness"] = brightness
         
         async with self.client:
             logger.info(f"Calling HassLightSet for name={names}, area={area}, brightness={brightness}")
@@ -240,6 +240,12 @@ class MCPHomeAssistantServer:
         )
 
         async def get_device_info() -> List[Dict[str, Any]]:
+            """
+            Get processed device context from Home Assistant.
+
+            Returns:
+                A list of device dictionaries with processed information.
+            """
             try:
                 logger.info("get_device_info invoked")
                 return await self.controller.get_processed_context(force_refresh=True)
