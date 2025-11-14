@@ -1,6 +1,6 @@
 [project]
 name = "home-assistant-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Add your description here"
 readme = "README.md"
 authors = [
@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp>=2.13.0.2",
-    "home-assistant-sdk>=0.1.0",
+    "home-assistant-sdk>=0.1.1",
 ]
 
 [project.scripts]
